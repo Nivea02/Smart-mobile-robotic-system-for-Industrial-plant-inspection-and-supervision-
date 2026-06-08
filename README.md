@@ -70,8 +70,6 @@ Power Monitoring| Real-time
 ---
 
 
----
-
 Installation
 
 ESP32 Firmware
