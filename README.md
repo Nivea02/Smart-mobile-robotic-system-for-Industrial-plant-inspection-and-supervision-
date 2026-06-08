@@ -110,14 +110,325 @@ smart-mobile-robotic-system/
 
 ### Software Setup
 
-**ESP32 firmware:**
-```bash
-# Open src/main.ino in Arduino IDE
-# Install required libraries:
-#   - VL53L0X by Pololu
-#   - DHT sensor library by Adafruit
-# Select board: ESP32 Dev Module
-# Upload to device
+**IoT webserver**
+#include <IotWebServer.h>
+#include <ArduinoOTA.h>
+#include <LiquidCrystal_I2C.h>
+#include <Wire.h>
+#include <DHT.h>
+#include <Adafruit_MPU6050.h>
+#include <Adafruit_Sensor.h>
+#include <Adafruit_VL53L0X.h>
+
+/* ================= IOT CONFIG ================= */
+
+const char *Wifi_AP_name = "ESP Server";
+String apikey = "94UnCTxEpaag";
+
+/* ================= PIN DEFINITIONS ================= */
+
+int IN[] = {25, 26, 27, 13};
+int analog_pins[] = {33};   // MQ135
+int button = 14;
+int buzzer = 23;
+
+int i2c[] = {21, 22};
+int uart2[] = {17, 16};     // HC12
+
+#define DHTPIN 18
+#define DHTTYPE DHT11
+
+/* ================= OBJECTS ================= */
+
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+DHT dht(DHTPIN, DHTTYPE);
+Adafruit_MPU6050 mpu;
+Adafruit_VL53L0X lox;
+
+/* ================= VARIABLES ================= */
+
+String buttonstat = "0000";
+
+float temperature = 0;
+float humidity = 0;
+int gasValue = 0;
+float vibration = 0;
+int distanceMM = 0;
+
+float voltage = 0;
+float current = 0;
+float power = 0;
+float pf = 0;
+
+/* ================= TIMERS ================= */
+
+unsigned long lastUploadTime = 0;
+const unsigned long uploadInterval = 5000;
+
+unsigned long lastLCD = 0;
+const unsigned long lcdInterval = 2000;
+
+unsigned long lastDHT = 0;
+const unsigned long dhtInterval = 2000;
+
+int lcdPage = 0;
+
+/* ================= BUZZER ================= */
+
+void alertBeep() {
+  digitalWrite(buzzer, HIGH); delay(80);
+  digitalWrite(buzzer, LOW);  delay(80);
+  digitalWrite(buzzer, HIGH); delay(80);
+  digitalWrite(buzzer, LOW);
+}
+
+/* ================= SETUP ================= */
+
+void setup() {
+
+  Serial.begin(115200);
+  Serial2.begin(9600, SERIAL_8N1, uart2[1], uart2[0]);
+
+  pinMode(button, INPUT);
+  pinMode(buzzer, OUTPUT);
+
+  for(int i=0;i<4;i++) pinMode(IN[i], OUTPUT);
+
+  lcd.init();
+  lcd.backlight();
+  lcd.setCursor(0,0);
+  lcd.print("INSPECTION BOT");
+
+  Wire.begin(i2c[0],i2c[1]);
+
+  dht.begin();
+  mpu.begin();
+
+  if(!lox.begin()){
+    lcd.setCursor(0,1);
+    lcd.print("VL53 FAIL");
+    while(1);
+  }
+
+  set_wifiAP_name(Wifi_AP_name);
+  set_update_timeout(2000);
+  set_debug(false);
+
+  delay(1000);
+
+  if(digitalRead(button)){
+    startAP();
+    lcd.clear();
+    lcd.print("AP MODE");
+  }
+  else{
+    startWiFi();
+    lcd.clear();
+    lcd.print("WiFi Connected");
+  }
+
+  delay(2000);
+  lcd.clear();
+
+  ArduinoOTA.setHostname("IotWebServer");
+  ArduinoOTA.begin();
+}
+
+/* ================= LOOP ================= */
+
+void loop() {
+
+  ArduinoOTA.handle();
+
+  /* ===== ROBOT CONTROL ===== */
+
+  buttonstat = updatebutton(apikey);
+
+  if(buttonstat[0]=='1'){
+    digitalWrite(IN[0],HIGH);
+    digitalWrite(IN[1],LOW);
+    digitalWrite(IN[2],HIGH);
+    digitalWrite(IN[3],LOW);
+  }
+  else if(buttonstat[1]=='1'){
+    digitalWrite(IN[0],LOW);
+    digitalWrite(IN[1],HIGH);
+    digitalWrite(IN[2],LOW);
+    digitalWrite(IN[3],HIGH);
+  }
+  else if(buttonstat[2]=='1'){
+    digitalWrite(IN[0],LOW);
+    digitalWrite(IN[1],HIGH);
+    digitalWrite(IN[2],HIGH);
+    digitalWrite(IN[3],LOW);
+  }
+  else if(buttonstat[3]=='1'){
+    digitalWrite(IN[0],HIGH);
+    digitalWrite(IN[1],LOW);
+    digitalWrite(IN[2],LOW);
+    digitalWrite(IN[3],HIGH);
+  }
+  else{
+    digitalWrite(IN[0],LOW);
+    digitalWrite(IN[1],LOW);
+    digitalWrite(IN[2],LOW);
+    digitalWrite(IN[3],LOW);
+  }
+
+  /* ===== DHT SAFE READ ===== */
+
+  if(millis()-lastDHT>=dhtInterval){
+    lastDHT=millis();
+
+    temperature = dht.readTemperature();
+    humidity = dht.readHumidity();
+
+    if(isnan(temperature) || isnan(humidity)){
+      temperature = 0;
+      humidity = 0;
+    }
+  }
+
+  /* ===== GAS SENSOR ===== */
+
+  gasValue = analogRead(analog_pins[0]);
+
+  /* ===== MPU6050 ===== */
+
+  sensors_event_t a,g,t;
+  mpu.getEvent(&a,&g,&t);
+  vibration = abs(a.acceleration.x)+abs(a.acceleration.y)+abs(a.acceleration.z);
+
+  /* ===== VL53L0X ===== */
+
+  VL53L0X_RangingMeasurementData_t measure;
+  lox.rangingTest(&measure,false);
+
+  if(measure.RangeStatus!=4)
+    distanceMM=measure.RangeMilliMeter;
+  else
+    distanceMM=8190;
+
+  /* ===== HC12 RECEIVE ===== */
+
+  if(Serial2.available()){
+    String data=Serial2.readStringUntil('\n');
+    sscanf(data.c_str(),"%f,%f,%f,%f",&voltage,&current,&power,&pf);
+  }
+
+  /* ===== ALERT LOGIC ===== */
+
+  String alert="";
+
+  if(gasValue>2000) alert="TOXIC GAS";
+  else if(vibration>25) alert="HIGH VIBRATION";
+  else if(temperature>60) alert="OVER TEMP";
+  else if(distanceMM<150) alert="OBJECT CLOSE";
+  else if(voltage<180 || pf<0.7) alert="POWER FAULT";
+
+  if(alert!="") alertBeep();
+
+  /* ===== SENSOR MESSAGE ===== */
+
+  String sensorMessage =
+  "Temp:" + String(temperature) +
+  "|Hum:" + String(humidity) +
+  "|Dist:" + String(distanceMM) +
+  "|Gas:" + String(gasValue) +
+  "|Vib:" + String(vibration) +
+  "|Volt:" + String(voltage) +
+  "|Curr:" + String(current) +
+  "|Power:" + String(power) +
+  "|PF:" + String(pf);
+
+  /* ===== IOT UPDATE ===== */
+
+  if(millis()-lastUploadTime>=uploadInterval){
+
+    lastUploadTime=millis();
+
+    if(alert!=""){
+      buttonstat = updateSensor_now(
+      apikey,
+      alert + " | " + sensorMessage,
+      temperature,
+      humidity,
+      distanceMM,
+      gasValue,
+      vibration,
+      voltage,
+      current,
+      power,
+      pf);
+    }
+    else{
+      buttonstat = updateSensor(
+      apikey,
+      sensorMessage,
+      temperature,
+      humidity,
+      distanceMM,
+      gasValue,
+      vibration,
+      voltage,
+      current,
+      power,
+      pf);
+    }
+  }
+
+  /* ===== LCD DISPLAY ===== */
+
+  if(millis()-lastLCD>=lcdInterval){
+
+    lastLCD=millis();
+    lcd.clear();
+
+    if(lcdPage==0){
+      lcd.setCursor(0,0);
+      lcd.print("T:");
+      lcd.print(temperature);
+      lcd.print(" H:");
+      lcd.print(humidity);
+
+      lcd.setCursor(0,1);
+      lcd.print("D:");
+      lcd.print(distanceMM);
+      lcd.print(" G:");
+      lcd.print(gasValue);
+    }
+
+    else if(lcdPage==1){
+      lcd.setCursor(0,0);
+      lcd.print("Vib:");
+      lcd.print(vibration);
+
+      lcd.setCursor(0,1);
+      lcd.print("V:");
+      lcd.print(voltage);
+      lcd.print(" I:");
+      lcd.print(current);
+    }
+
+    else if(lcdPage==2){
+      lcd.setCursor(0,0);
+      lcd.print("P:");
+      lcd.print(power);
+      lcd.print(" PF:");
+      lcd.print(pf);
+
+      lcd.setCursor(0,1);
+      if(alert!="") lcd.print("ALERT!");
+      else lcd.print("STATUS OK");
+    }
+
+    lcdPage++;
+    if(lcdPage>2) lcdPage=0;
+  }
+
+  checkwificonnection();
+}
+
 ```
 
 **YOLO inference (Python):**
