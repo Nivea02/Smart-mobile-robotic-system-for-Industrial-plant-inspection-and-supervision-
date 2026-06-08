@@ -115,4 +115,4 @@ About
 Nivea Pramod B.Tech Electronics & Communication Engineering — KTU, Kerala (2022–26)
 � �
 License
-This project is licensed under the MIT License. 
+This project is licensed under the MIT License.
