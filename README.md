@@ -72,7 +72,7 @@ Power Monitoring| Real-time
 Project Structure
 
 smart-mobile-robotic-system/ https://drive.google.com/file/d/1asmBdFY-5aXPNqpg4b4igW1iqb02EStu/view?usp=drivesdk
-│   ├──https://drive.google.com/file/d/1j6cYAwI6UZ_0GjmU-vXPtz07QhlIm5W9/view?usp=drivesdk
+ https://drive.google.com/file/d/1j6cYAwI6UZ_0GjmU-vXPtz07QhlIm5W9/view?usp=drivesdk
 
 ---
 
