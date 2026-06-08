@@ -137,4 +137,4 @@ APJ Abdul Kalam Technological University (KTU), Kerala
 
 License
 
-This project is licensed under the MIT License.
+This project is licensed under the MIT License. 
