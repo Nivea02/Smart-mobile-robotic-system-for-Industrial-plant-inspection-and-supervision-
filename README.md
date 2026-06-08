@@ -69,22 +69,6 @@ Power Monitoring| Real-time
 
 ---
 
-Project Structure
-
-smart-mobile-robotic-system/
-├── README.md
-├── assets/
-│   ├── robot_photo.jpg
-│   ├── system_architecture.png
-│   └── demo.gif
-├── src/
-│   ├── main.ino
-│   ├── lidar.ino
-│   ├── sensors.ino
-│   └── detection.py
-├── docs/
-│   └── wiring_diagram.pdf
-└── requirements.txt
 
 ---
 
