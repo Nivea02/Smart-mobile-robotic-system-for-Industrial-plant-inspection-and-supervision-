@@ -1,118 +1,140 @@
 Smart Mobile Robotic System
-ESP32-based autonomous inspection robot with LiDAR sensing, multi-parameter environmental monitoring, and real-time YOLO hazard detection.
-� � � � � �
+
+ESP32-based autonomous inspection robot with LiDAR sensing, environmental monitoring, and real-time YOLO hazard detection.
+
 Problem Statement
-Manual inspection of confined, hazardous, or hard-to-reach spaces poses significant safety risks to personnel. Static monitoring systems lack mobility and real-time response capability. This project addresses these limitations by developing an autonomous mobile robot that navigates enclosed environments, maps surroundings using LiDAR, monitors environmental parameters, and identifies hazards using onboard AI — without requiring human entry.
+
+Manual inspection of confined, hazardous, or hard-to-reach environments exposes personnel to safety risks. Traditional static monitoring systems lack mobility and real-time situational awareness.
+
+This project addresses these challenges by developing an autonomous mobile robot capable of navigating enclosed spaces, mapping surroundings using LiDAR, monitoring environmental conditions, and detecting hazards using onboard AI—without requiring human entry.
+
+---
+
+Key Features
+
+- Autonomous navigation and obstacle avoidance
+- Real-time LiDAR-based distance sensing
+- Temperature and humidity monitoring
+- On-device YOLO hazard detection
+- Power telemetry monitoring
+- ESP32-based control architecture
+- No cloud dependency for inference
+
+---
+
 System Overview
-The robot integrates three core subsystems:
-Navigation & Mapping — VL53L0X LiDAR provides real-time obstacle detection and distance measurement up to 2m, enabling autonomous path planning in constrained spaces.
-Environmental Sensing — DHT11 sensor continuously monitors temperature and humidity; power telemetry tracks system health.
-Hazard Detection — A lightweight YOLO-based object detection model runs onboard, classifying hazards from a live camera feed with approximately 80% identification accuracy.
-System Architecture
-┌─────────────────────────────────────────────────┐
-│                   ESP32 Controller               │
-│                                                 │
-│  ┌──────────────┐    ┌──────────────────────┐  │
-│  │ VL53L0X      │    │  Camera Module        │  │
-│  │ LiDAR (2m)   │    │  (640×480 feed)       │  │
-│  └──────┬───────┘    └──────────┬───────────┘  │
-│         │                       │               │
-│  ┌──────▼───────┐    ┌──────────▼───────────┐  │
-│  │ Obstacle Map │    │  YOLO Inference       │  │
-│  │ & Navigation │    │  (~80% accuracy)      │  │
-│  └──────┬───────┘    └──────────┬───────────┘  │
-│         │                       │               │
-│  ┌──────▼───────┐    ┌──────────▼───────────┐  │
-│  │ DHT11        │    │  Hazard Alert         │  │
-│  │ Temp/Humidity│    │  Output               │  │
-│  └──────────────┘    └───────────────────────┘  │
-│                                                 │
-│         Power Telemetry (continuous)            │
-└─────────────────────────────────────────────────┘
+
+The robot integrates three major subsystems:
+
+1. Navigation & Mapping
+
+- VL53L0X LiDAR sensor
+- Obstacle detection up to 2 meters
+- Autonomous path planning in confined environments
+
+2. Environmental Monitoring
+
+- DHT11 temperature and humidity sensing
+- Continuous system health monitoring
+- Real-time power telemetry
+
+3. Hazard Detection
+
+- Lightweight YOLO object detection model
+- Live camera-based hazard recognition
+- Approximately 80% detection accuracy during testing
+
+---
+
 Hardware Components
-Component
-Role
-Specification
-ESP32
-Main microcontroller
-240 MHz dual-core, Wi-Fi + BT
-VL53L0X
-Distance / obstacle sensing
-Range up to 2m, I2C interface
-DHT11
-Temperature & humidity sensing
-±2°C / ±5% RH accuracy
-Camera Module
-Object detection input
-640×480 @ 30fps
-Power sensor
-System health telemetry
-Voltage & current monitoring
-Motor driver
-Mobility control
-DC motor interface
-Key Results
-Metric
-Value
-Object detection accuracy
-~80% across test scenarios
-LiDAR obstacle detection range
-Up to 2m
-Inference type
-On-device (no cloud dependency)
-Test environment
-Indoor / lab
-Power monitoring
-Real-time onboard telemetry
+
+Component| Role| Specification
+ESP32| Main controller| 240 MHz Dual-Core, Wi-Fi & Bluetooth
+VL53L0X| Distance sensing| Up to 2 m range
+DHT11| Environment sensing| Temperature & Humidity
+Camera Module| Object detection| 640×480 @ 30 FPS
+Power Sensor| Telemetry| Voltage & Current Monitoring
+Motor Driver| Mobility control| DC Motor Interface
+
+---
+
+Performance Results
+
+Metric| Result
+Object Detection Accuracy| ~80%
+LiDAR Detection Range| Up to 2 m
+Inference Type| On-device
+Test Environment| Indoor / Laboratory
+Power Monitoring| Real-time
+
+---
+
 Project Structure
+
 smart-mobile-robotic-system/
 ├── README.md
 ├── assets/
-│   ├── robot_photo.jpg          ← Add your robot photo here
-│   ├── system_architecture.png  ← Add your block diagram here
-│   └── demo.gif                 ← Add a demo GIF if available
+│   ├── robot_photo.jpg
+│   ├── system_architecture.png
+│   └── demo.gif
 ├── src/
-│   ├── main.ino                 ← ESP32 main controller code
-│   ├── lidar.ino                ← VL53L0X LiDAR interface
-│   ├── sensors.ino              ← DHT11 & power telemetry
-│   └── detection.py             ← YOLO inference script
+│   ├── main.ino
+│   ├── lidar.ino
+│   ├── sensors.ino
+│   └── detection.py
 ├── docs/
-│   └── wiring_diagram.pdf       ← Add your wiring diagram here
-└── requirements.txt             ← Python dependencies
-Setup & Installation
-Hardware Setup
-Connect VL53L0X to ESP32 via I2C (SDA → GPIO21, SCL → GPIO22)
-Connect DHT11 data pin → GPIO4
-Connect camera module via appropriate interface
-Connect motor driver to GPIO pins (refer to wiring diagram in /docs)
-Software Setup
-ESP32 firmware:
-# Open src/main.ino in Arduino IDE
-# Install required libraries:
-#   - VL53L0X by Pololu
-#   - DHT sensor library by Adafruit
-# Select board: ESP32 Dev Module
-# Upload to device
-YOLO inference (Python):
-# Install dependencies
-pip install -r requirements.txt
+│   └── wiring_diagram.pdf
+└── requirements.txt
 
-# Run detection
+---
+
+Installation
+
+ESP32 Firmware
+
+1. Open "src/main.ino" in Arduino IDE
+2. Install required libraries:
+   - VL53L0X (Pololu)
+   - DHT Sensor Library (Adafruit)
+3. Select ESP32 Dev Module
+4. Upload firmware
+
+YOLO Detection
+
+pip install -r requirements.txt
 python src/detection.py
-Limitations & Future Work
-Current limitations:
-Detection accuracy degrades in low-light conditions
-YOLO model trained on limited hazard classes
-LiDAR range constrained to 2m — insufficient for large open spaces
-Single-camera setup creates blind spots
-Planned improvements:
-Integrate IR illumination for low-light performance
-Expand training dataset with domain-specific hazard classes
-Add multi-sensor LiDAR array for wider coverage
-Implement SLAM for autonomous navigation
-Wi-Fi based remote monitoring dashboard via ESP32
-About
-Nivea Pramod B.Tech Electronics & Communication Engineering — KTU, Kerala (2022–26)
-� �
+
+---
+
+Current Limitations
+
+- Reduced performance in low-light conditions
+- Limited hazard-class training dataset
+- LiDAR range restricted to 2 meters
+- Single-camera blind spots
+
+---
+
+Future Improvements
+
+- Infrared illumination for night operation
+- Expanded hazard detection dataset
+- Multi-LiDAR sensor configuration
+- SLAM-based autonomous navigation
+- Remote monitoring dashboard via Wi-Fi
+- Cloud-based data logging and analytics
+
+---
+
+Author
+
+Nivea Pramod
+B.Tech Electronics & Communication Engineering
+APJ Abdul Kalam Technological University (KTU), Kerala
+2022–2026
+
+---
+
 License
+
 This project is licensed under the MIT License.
