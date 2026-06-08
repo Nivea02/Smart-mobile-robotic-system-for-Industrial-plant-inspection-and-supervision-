@@ -121,12 +121,156 @@ smart-mobile-robotic-system/
 ```
 
 **YOLO inference (Python):**
-```bash
-# Install dependencies
-pip install -r requirements.txt
+```import cv2
+import time
+import numpy as np
+import serial
+import pyttsx3
+import requests
 
-# Run detection
-python src/detection.py
+# ---------------- IOT SETTINGS ----------------
+api_key = "94UnCTxEpaag"
+
+def update_server(message):
+    url = "https://postdata.iotwebserver.com/postdata.php?apikey=" + api_key + "&alert=" + message + "&sensor_1=1"
+    print(url)
+    try:
+        response = requests.get(url)
+        if response.status_code == 200:
+            print("IoT Sent:", response.text)
+        else:
+            print("IoT Error:", response.status_code)
+    except:
+        print("IoT connection failed")
+
+
+# ---------------- VOICE ENGINE ----------------
+engine = pyttsx3.init()
+voice = engine.getProperty('voices')
+engine.setProperty('voice', voice[1].id)
+
+# ---------------- YOLO FILES ----------------
+labelsPath = 'coco.names'
+LABELS = open(labelsPath).read().strip().split("\n")
+
+np.random.seed(100)
+COLORS = np.random.randint(0, 255, size=(len(LABELS), 3), dtype="uint8")
+
+weightsPath = 'yolov3.weights'
+configPath = 'yolov3.cfg'
+
+conf = 0.7
+threshold = 0.3
+
+print("[INFO] loading YOLO from disk...")
+net = cv2.dnn.readNetFromDarknet(configPath, weightsPath)
+
+# ---------------- SERIAL ----------------
+arduino = serial.Serial(port='COM18', baudrate=9600, timeout=1)
+
+def serialprint(x):
+    x = x + "\n"
+    arduino.write(bytes(x, 'utf-8'))
+    time.sleep(0.05)
+    data = ""
+    data = data.strip()
+    print(data)
+    return data
+
+
+# ---------------- CAMERA ----------------
+vs = cv2.VideoCapture(0)
+
+# to avoid repeated IoT alerts
+plast_object = ""
+
+while True:
+
+    ret, frame = vs.read()
+
+    if ret:
+
+        image = frame
+        (H, W) = image.shape[:2]
+
+        ln = net.getLayerNames()
+        ln = [ln[i - 1] for i in net.getUnconnectedOutLayers()]
+
+        blob = cv2.dnn.blobFromImage(image, 1 / 255.0, (416, 416),
+                                     swapRB=True, crop=False)
+
+        net.setInput(blob)
+        layerOutputs = net.forward(ln)
+
+        boxes = []
+        confidences = []
+        classIDs = []
+
+        for output in layerOutputs:
+
+            for detection in output:
+
+                scores = detection[5:]
+                classID = np.argmax(scores)
+                confidence = scores[classID]
+
+                if confidence > conf:
+
+                    box = detection[0:4] * np.array([W, H, W, H])
+                    (centerX, centerY, width, height) = box.astype("int")
+
+                    x = int(centerX - (width / 2))
+                    y = int(centerY - (height / 2))
+
+                    boxes.append([x, y, int(width), int(height)])
+                    confidences.append(float(confidence))
+                    classIDs.append(classID)
+
+        idxs = cv2.dnn.NMSBoxes(boxes, confidences, conf, threshold)
+
+        if len(idxs) > 0:
+
+            for i in idxs.flatten():
+
+                (x, y) = (boxes[i][0], boxes[i][1])
+                (w, h) = (boxes[i][2], boxes[i][3])
+
+                color = [int(c) for c in COLORS[classIDs[i]]]
+
+                cv2.rectangle(image, (x, y), (x + w, y + h), color, 2)
+
+                text = "{}: {:.4f}".format(
+                    LABELS[classIDs[i]], confidences[i])
+
+                cv2.putText(image, text, (x, y - 5),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+
+                detected_object = LABELS[classIDs[i]]
+
+                print(detected_object, confidences[i])
+
+                # SEND SERIAL TO ESP32
+                serialprint(detected_object)
+
+                # SEND IOT ALERT ONLY IF NEW OBJECT
+                if plast_object != detected_object:
+                    update_server(detected_object + " Detected")
+                    plast_object = detected_object
+
+                # VOICE ALERT
+                engine.say(detected_object + " Detected")
+                engine.runAndWait()
+
+    cv2.imshow("Image", image)
+
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+
+
+vs.release()
+cv2.destroyAllWindows()
+
+
 ```
 
 ---
